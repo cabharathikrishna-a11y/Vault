@@ -29,8 +29,8 @@ data class AppUpdateInfo(
 object AppUpdateManager {
     private const val TAG = "AppUpdateManager"
     
-    // Default RTDB endpoint for the project
-    const val DEFAULT_RTDB_UPDATE_URL = "https://gen-lang-client-0143157303-default-rtdb.firebaseio.com/app_update.json"
+    // Default RTDB endpoint for the project provided by user
+    const val DEFAULT_RTDB_UPDATE_URL = "https://familyvault2007-default-rtdb.asia-southeast1.firebasedatabase.app/app_update.json"
 
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)

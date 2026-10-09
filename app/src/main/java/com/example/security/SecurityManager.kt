@@ -1,11 +1,14 @@
 package com.example.security
 
 import android.content.Context
+import android.content.RestrictionsManager
 import android.content.SharedPreferences
 import android.os.Build
+import android.os.Bundle
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import android.view.WindowManager
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
@@ -17,6 +20,14 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
+data class EmmPolicy(
+    val isManaged: Boolean = false,
+    val disallowScreenshots: Boolean = true,
+    val enforceBiometrics: Boolean = false,
+    val autoLockTimeoutSeconds: Int = 300,
+    val allowExport: Boolean = true
+)
+
 class SecurityManager(private val context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("family_vault_security_prefs", Context.MODE_PRIVATE)
 
@@ -26,6 +37,41 @@ class SecurityManager(private val context: Context) {
         private const val KEY_DARK_MODE_SETTING = "dark_mode_setting" // "system", "dark", "light"
         private const val KEY_SAVED_PASSPHRASE = "encrypted_saved_passphrase"
         private const val KEYSTORE_ALIAS = "family_vault_passphrase_alias"
+    }
+
+    /**
+     * Inspects Enterprise Mobility Management (EMM) restrictions applied by device management / MDM.
+     */
+    fun getEmmPolicy(): EmmPolicy {
+        return try {
+            val restrictionsManager = context.getSystemService(Context.RESTRICTIONS_SERVICE) as? RestrictionsManager
+            val applicationRestrictions: Bundle? = restrictionsManager?.applicationRestrictions
+            if (applicationRestrictions != null && !applicationRestrictions.isEmpty) {
+                EmmPolicy(
+                    isManaged = true,
+                    disallowScreenshots = applicationRestrictions.getBoolean("disallow_screenshots", true),
+                    enforceBiometrics = applicationRestrictions.getBoolean("enforce_biometrics", false),
+                    autoLockTimeoutSeconds = applicationRestrictions.getInt("auto_lock_timeout", 300),
+                    allowExport = applicationRestrictions.getBoolean("allow_export", true)
+                )
+            } else {
+                EmmPolicy(isManaged = false, disallowScreenshots = true)
+            }
+        } catch (_: Exception) {
+            EmmPolicy(isManaged = false, disallowScreenshots = true)
+        }
+    }
+
+    /**
+     * Applies Window FLAG_SECURE for screenshot disallowance per EMM policy / Vault security standard.
+     */
+    fun applyEmmWindowSecurity(activity: FragmentActivity) {
+        val policy = getEmmPolicy()
+        if (policy.disallowScreenshots) {
+            activity.window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        } else {
+            activity.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
     }
 
     private fun getOrCreateKeyStoreKey(): SecretKey {

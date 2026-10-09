@@ -33,14 +33,32 @@ class FirestoreVaultRepository(
 ) {
     // Secondary constructor resolving named database ID
     constructor(context: Context) : this(
-        FirebaseFirestore.getInstance(
-            context.applicationContext.getString(R.string.firestore_database_id)
-        ),
+        context.applicationContext.getString(R.string.firestore_database_id).let { dbId ->
+            if (dbId.isBlank() || dbId == "(default)") {
+                FirebaseFirestore.getInstance()
+            } else {
+                FirebaseFirestore.getInstance(dbId)
+            }
+        },
         AppDatabase.getInstance(context)
     )
 
     private val auth = Firebase.auth
+    private val rtdbRepo = RtdbRepository()
     private val repositoryScope = CoroutineScope(Dispatchers.IO)
+
+    init {
+        try {
+            val settings = com.google.firebase.firestore.FirebaseFirestoreSettings.Builder()
+                .setLocalCacheSettings(
+                    com.google.firebase.firestore.PersistentCacheSettings.newBuilder().build()
+                )
+                .build()
+            db.firestoreSettings = settings
+        } catch (_: Exception) {
+            // Settings already initialized
+        }
+    }
 
     fun requireUserId(): String {
         return auth.currentUser?.uid
@@ -361,6 +379,9 @@ class FirestoreVaultRepository(
                     isSynced = true
                 )
             )
+            if (updatedItem.familyId.isNotBlank()) {
+                rtdbRepo.updateLastSyncTimestamp(updatedItem.familyId, uid)
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             handleFirestoreError(e, OperationType.WRITE, docRef.path)
@@ -479,6 +500,15 @@ class FirestoreVaultRepository(
 
     suspend fun saveUserProfile(profile: UserProfile): Result<Unit> {
         val uid = requireUserId()
+        // 1. Save user info to Realtime Database (RTDB) as requested
+        rtdbRepo.saveUserInfo(
+            uid = uid,
+            displayName = profile.displayName,
+            email = profile.email,
+            familyId = profile.familyId
+        )
+
+        // 2. Also persist in Firestore
         val docRef = db.collection("users").document(uid)
         val payload = mapOf(
             "userId" to uid,
@@ -503,15 +533,16 @@ class FirestoreVaultRepository(
         }
         val path = "users/$userId"
         emitAll(
-            db.collection("users").document(userId)
-                .snapshots()
-                .map { snapshot ->
-                    if (snapshot.exists()) snapshot.toObject(UserProfile::class.java) else null
+            rtdbRepo.observeUserInfo(userId).map { rtdbProfile ->
+                rtdbProfile ?: run {
+                    try {
+                        val snapshot = db.collection("users").document(userId).get().await()
+                        if (snapshot.exists()) snapshot.toObject(UserProfile::class.java) else null
+                    } catch (_: Exception) {
+                        null
+                    }
                 }
-                .catch { error ->
-                    if (error is Exception) handleFirestoreError(error, OperationType.GET, path)
-                    emit(null)
-                }
+            }
         )
     }
 

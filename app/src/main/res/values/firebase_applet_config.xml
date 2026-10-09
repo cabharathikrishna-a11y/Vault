@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <resources>
-    <string name="firestore_database_id" translatable="false">ai-studio-android-familyva-1c864252-5d34-4b45-b0ac-dbc835489bda</string>
+    <string name="firestore_database_id" translatable="false">(default)</string>
+    <string name="google_storage_bucket" translatable="false">familyvault2007.firebasestorage.app</string>
+    <string name="firebase_database_url" translatable="false">https://familyvault2007-default-rtdb.asia-southeast1.firebasedatabase.app</string>
 </resources>

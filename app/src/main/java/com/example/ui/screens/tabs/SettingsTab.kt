@@ -595,7 +595,7 @@ fun SettingsTab(
                         value = customRtdbInput,
                         onValueChange = { customRtdbInput = it },
                         label = { Text("Custom RTDB / Update JSON Endpoint") },
-                        placeholder = { Text("https://your-rtdb.firebaseio.com/app_update.json") },
+                        placeholder = { Text("https://familyvault2007-default-rtdb.asia-southeast1.firebasedatabase.app/app_update.json") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )

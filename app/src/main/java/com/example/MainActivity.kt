@@ -38,6 +38,7 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        vaultViewModel.securityManager.applyEmmWindowSecurity(this)
 
         setContent {
             val darkModeSetting by vaultViewModel.darkModeSetting.collectAsState()

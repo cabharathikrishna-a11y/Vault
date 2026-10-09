@@ -109,8 +109,11 @@ dependencies {
   implementation(libs.androidx.biometric)
   implementation(libs.converter.moshi)
   implementation(libs.firebase.ai)
-  // Firestore:
+  implementation(libs.firebase.perf)
+  // Firestore & Realtime Database & Storage:
   implementation(libs.firebase.firestore)
+  implementation(libs.firebase.database)
+  implementation(libs.firebase.storage)
 
   // Firebase Auth and Google Sign-In via Credential Manager:
   implementation(libs.firebase.auth)

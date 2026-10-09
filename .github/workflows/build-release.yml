@@ -41,8 +41,10 @@ jobs:
           echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
 
       - name: Build Android Release APK
+        env:
+          GRADLE_OPTS: "-Djava.awt.headless=true"
         run: |
-          gradle assembleRelease --no-daemon
+          gradle assembleRelease
 
       - name: Locate APK File
         id: apk_file
