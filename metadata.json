@@ -1,0 +1,6 @@
+{
+  "name": "Family Vault",
+  "description": "End-to-end encrypted family documents and password sharing vault with biometric lock, cloud sync, and password generator.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

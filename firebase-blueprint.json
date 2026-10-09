@@ -1,0 +1,103 @@
+{
+  "entities": {
+    "Family": {
+      "title": "Family Vault",
+      "description": "Metadata for a shared family vault including key verification parameters",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "memberUids": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "salt": { "type": "string" },
+        "keyCheckHash": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "createdBy", "memberUids", "salt", "keyCheckHash"]
+    },
+    "VaultItem": {
+      "title": "Vault Item",
+      "description": "Encrypted item containing passwords, national IDs (e.g. Aadhaar), or documents",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "familyId": { "type": "string" },
+        "isPrivate": { "type": "boolean" },
+        "itemType": { "type": "string", "enum": ["password", "document", "id_card", "note", "bank"] },
+        "encryptedTitle": { "type": "string" },
+        "encryptedPayload": { "type": "string" },
+        "createdByUid": { "type": "string" },
+        "createdByName": { "type": "string" },
+        "memberUids": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "hasAttachment": { "type": "boolean" },
+        "attachmentType": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "familyId", "isPrivate", "itemType", "encryptedTitle", "encryptedPayload", "createdByUid", "memberUids"]
+    },
+    "PasswordHistory": {
+      "title": "Password History Entry",
+      "description": "Record of a generated password synced across family devices",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "familyId": { "type": "string" },
+        "encryptedPassword": { "type": "string" },
+        "length": { "type": "integer" },
+        "optionsSummary": { "type": "string" },
+        "generatedByUid": { "type": "string" },
+        "generatedByName": { "type": "string" },
+        "memberUids": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "familyId", "encryptedPassword", "length", "generatedByUid", "generatedByName", "memberUids"]
+    },
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User profile linking user to their joined family vault",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "familyId": { "type": "string" },
+        "joinedAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "email"]
+    }
+  },
+  "firestore": {
+    "/families/{familyId}": {
+      "schema": "Family",
+      "description": "Shared family metadata and member roster"
+    },
+    "/families/{familyId}/vault_items/{itemId}": {
+      "schema": "VaultItem",
+      "description": "Shared encrypted passwords, Aadhaar cards, and family documents"
+    },
+    "/families/{familyId}/password_history/{historyId}": {
+      "schema": "PasswordHistory",
+      "description": "Password generation history synced across family members"
+    },
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Individual user vault settings and family affiliation"
+    },
+    "/users/{userId}/private_items/{itemId}": {
+      "schema": "VaultItem",
+      "description": "Personal private vault items visible only to the owning user"
+    }
+  }
+}
