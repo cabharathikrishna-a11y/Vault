@@ -371,15 +371,19 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun joinFamilyVault(familyId: String, passphrase: String) {
-        if (familyId.isBlank() || passphrase.isBlank()) {
-            _statusMessage.value = "Enter valid Family ID and Master Passphrase"
+        val cleanId = familyId.trim().removeSurrounding("\"", "\"").removeSurrounding("'", "'")
+        if (cleanId.isBlank() || passphrase.isBlank()) {
+            _statusMessage.value = "Please enter both Family Vault ID and Master Passphrase"
             return
         }
 
         _isProcessing.value = true
         viewModelScope.launch {
             try {
-                val result = repository.joinFamily(familyId.trim())
+                val result = kotlinx.coroutines.withTimeoutOrNull(12000) {
+                    repository.joinFamily(cleanId)
+                } ?: Result.failure(Exception("Connection timed out. Please check your network or Family ID."))
+
                 if (result.isSuccess) {
                     val family = result.getOrThrow()
                     val (isValid, derivedKey) = withContext(Dispatchers.Default) {
@@ -403,7 +407,8 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
                         _statusMessage.value = "Incorrect Family Master Passphrase."
                     }
                 } else {
-                    _statusMessage.value = "Could not find Family Vault with ID: $familyId"
+                    val errorMsg = result.exceptionOrNull()?.localizedMessage ?: "Could not find Family Vault with ID: $cleanId"
+                    _statusMessage.value = errorMsg
                 }
             } catch (e: Exception) {
                 _statusMessage.value = "Error joining vault: ${e.localizedMessage}"

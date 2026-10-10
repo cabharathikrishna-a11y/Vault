@@ -87,8 +87,14 @@ fun MasterPassphraseScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showResetDialog by remember { mutableStateOf(false) }
 
-    val statusMessage = vaultViewModel.statusMessage
+    val statusMessage by vaultViewModel.statusMessage.collectAsState()
     val isProcessing by vaultViewModel.isProcessing.collectAsState()
+
+    LaunchedEffect(statusMessage) {
+        statusMessage?.let { msg ->
+            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
 
     if (showResetDialog) {
         AlertDialog(
@@ -445,6 +451,28 @@ fun MasterPassphraseScreen(
                             Text("Verifying & Joining...", fontSize = 15.sp)
                         } else {
                             Text("Verify & Join Vault", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+
+                    val msgToDisplay = statusMessage ?: errorMessage
+                    if (msgToDisplay != null) {
+                        Spacer(modifier = Modifier.height(14.dp))
+                        val isSuccess = msgToDisplay.contains("Joined", ignoreCase = true) || msgToDisplay.contains("created", ignoreCase = true)
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isSuccess) VaultAccentEmerald.copy(alpha = 0.15f) else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = msgToDisplay,
+                                color = if (isSuccess) VaultAccentEmerald else MaterialTheme.colorScheme.onErrorContainer,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(12.dp).fillMaxWidth()
+                            )
                         }
                     }
                 }

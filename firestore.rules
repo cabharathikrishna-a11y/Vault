@@ -51,10 +51,7 @@ service cloud.firestore {
 
     // Family Vault metadata
     match /families/{familyId} {
-      allow read: if isAuthenticated() && (
-        request.auth.uid in resource.data.memberUids ||
-        resource.data.createdBy == request.auth.uid
-      );
+      allow read: if isAuthenticated();
       allow create: if isAuthenticated() &&
         request.resource.data.createdBy == request.auth.uid &&
         request.auth.uid in request.resource.data.memberUids &&

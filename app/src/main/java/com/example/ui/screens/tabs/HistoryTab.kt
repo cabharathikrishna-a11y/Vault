@@ -240,11 +240,40 @@ private fun PasswordHistoryCard(
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            Text(
-                text = "${item.length} chars · ${item.optionsSummary}",
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "${item.length} chars · ${item.optionsSummary}",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                // Sync Dot
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(VaultAccentEmerald.copy(alpha = 0.12f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(VaultAccentEmerald)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Cloud Synced",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = VaultAccentEmerald
+                    )
+                }
+            }
         }
     }
 }

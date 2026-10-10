@@ -146,15 +146,24 @@ fun SettingsTab(
                             }
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = family!!.name,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 16.sp
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(VaultAccentEmerald)
+                                    )
+                                }
                                 Text(
-                                    text = family!!.name,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp
-                                )
-                                Text(
-                                    text = "${family!!.memberUids.size} Family Members",
+                                    text = "${family!!.memberUids.size} Family Members · Cloud Connected",
                                     fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = VaultAccentEmerald
                                 )
                             }
                         }

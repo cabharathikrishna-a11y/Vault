@@ -1,11 +1,13 @@
 package com.example.data.repository
 
 import android.content.Context
+import android.util.Log
 import com.example.R
 import com.example.data.local.AppDatabase
 import com.example.data.local.LocalFamilyEntity
 import com.example.data.local.LocalPasswordHistoryEntity
 import com.example.data.local.LocalVaultItemEntity
+import com.example.data.model.AllowedFamilyMembers
 import com.example.data.model.FamilyVault
 import com.example.data.model.PasswordHistory
 import com.example.data.model.UserProfile
@@ -25,6 +27,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 
 class FirestoreVaultRepository(
@@ -165,7 +168,7 @@ class FirestoreVaultRepository(
                 "createdAt" to FieldValue.serverTimestamp(),
                 "updatedAt" to FieldValue.serverTimestamp()
             )
-            // Cache locally immediately so the app is always responsive
+            // 1. Instantly cache in Room DB so UI unlocks immediately without waiting on network ACKs
             database?.vaultDao()?.insertFamily(
                 LocalFamilyEntity(
                     id = family.id,
@@ -177,40 +180,99 @@ class FirestoreVaultRepository(
                     updatedAtMs = System.currentTimeMillis()
                 )
             )
-            db.collection("families").document(familyId).set(payload).await()
-            // Save profile affiliation
-            saveUserProfile(UserProfile(userId = uid, displayName = auth.currentUser?.displayName ?: "User", email = auth.currentUser?.email ?: "", familyId = familyId))
+
+            // 2. Queue Firestore write (writes to local persistence immediately, syncs to cloud in background)
+            db.collection("families").document(familyId).set(payload)
+
+            // 3. Save profile affiliation asynchronously without blocking vault creation UI
+            repositoryScope.launch {
+                try {
+                    saveUserProfile(UserProfile(userId = uid, displayName = auth.currentUser?.displayName ?: "User", email = auth.currentUser?.email ?: "", familyId = familyId))
+                } catch (e: Exception) {
+                    Log.w("FirestoreVaultRepo", "Async profile save notice: ${e.message}")
+                }
+            }
+
             Result.success(family)
         } catch (e: Exception) {
             handleFirestoreError(e, OperationType.CREATE, path)
-            // Even if network save is pending/delayed, local creation succeeded
             Result.success(family)
         }
     }
 
     suspend fun joinFamily(familyId: String): Result<FamilyVault> {
+        val cleanId = familyId.trim().removeSurrounding("\"", "\"").removeSurrounding("'", "'")
+        if (cleanId.isBlank()) {
+            return Result.failure(IllegalArgumentException("Please enter a valid Family Vault ID."))
+        }
         val uid = requireUserId()
-        val path = "families/$familyId"
+        val path = "families/$cleanId"
         return try {
-            val doc = db.collection("families").document(familyId).get().await()
-            if (!doc.exists()) {
-                return Result.failure(IllegalArgumentException("Family Vault ID not found."))
-            }
-            val family = doc.toObject(FamilyVault::class.java)
-                ?: return Result.failure(IllegalStateException("Invalid family data."))
+            val localFamily = database?.vaultDao()?.getFamilyOnce(cleanId)
 
-            if (!family.memberUids.contains(uid)) {
-                val updatedMembers = family.memberUids + uid
-                db.collection("families").document(familyId).update(
+            val doc = withTimeoutOrNull(5000) {
+                db.collection("families").document(cleanId).get().await()
+            }
+
+            val family: FamilyVault = (if (doc != null && doc.exists()) {
+                doc.toObject(FamilyVault::class.java)
+            } else if (localFamily != null) {
+                val members = mutableListOf<String>()
+                try {
+                    val arr = JSONArray(localFamily.memberUidsJson)
+                    for (i in 0 until arr.length()) members.add(arr.getString(i))
+                } catch (_: Exception) {}
+                FamilyVault(
+                    id = localFamily.id,
+                    name = localFamily.name,
+                    createdBy = localFamily.createdBy,
+                    memberUids = members,
+                    salt = localFamily.salt,
+                    keyCheckHash = localFamily.keyCheckHash
+                )
+            } else if (doc != null && !doc.exists()) {
+                return Result.failure(IllegalArgumentException("Family Vault ID '$cleanId' not found. Please verify the ID with your family admin."))
+            } else {
+                return Result.failure(Exception("Connection timeout verifying Family Vault ID. Please check network connection."))
+            }) ?: return Result.failure(IllegalStateException("Invalid family data structure."))
+
+            val currentMembers = family.memberUids.filter { it.isNotBlank() }
+            val updatedMembers = (currentMembers + uid).distinct()
+
+            if (!currentMembers.contains(uid)) {
+                db.collection("families").document(cleanId).update(
                     mapOf(
                         "memberUids" to updatedMembers,
                         "updatedAt" to FieldValue.serverTimestamp()
                     )
-                ).await()
+                )
             }
-            // Save affiliation in user profile
-            saveUserProfile(UserProfile(userId = uid, displayName = auth.currentUser?.displayName ?: "User", email = auth.currentUser?.email ?: "", familyId = familyId))
-            Result.success(family.copy(memberUids = family.memberUids + uid))
+
+            val displayName = auth.currentUser?.displayName ?: AllowedFamilyMembers.getDisplayName(auth.currentUser?.email)
+            val email = auth.currentUser?.email ?: ""
+            val updatedFamily = family.copy(memberUids = updatedMembers)
+
+            // Asynchronous background sync for Room & User Profile
+            repositoryScope.launch {
+                try {
+                    database?.vaultDao()?.insertFamily(
+                        LocalFamilyEntity(
+                            id = updatedFamily.id,
+                            name = updatedFamily.name,
+                            createdBy = updatedFamily.createdBy,
+                            memberUidsJson = JSONArray(updatedFamily.memberUids).toString(),
+                            salt = updatedFamily.salt,
+                            keyCheckHash = updatedFamily.keyCheckHash,
+                            updatedAtMs = System.currentTimeMillis()
+                        )
+                    )
+                    saveUserProfile(UserProfile(userId = uid, displayName = displayName, email = email, familyId = cleanId))
+                } catch (e: Exception) {
+                    Log.w("FirestoreVaultRepo", "Async join sync notice: ${e.message}")
+                }
+            }
+
+            Result.success(updatedFamily)
         } catch (e: Exception) {
             handleFirestoreError(e, OperationType.UPDATE, path)
             Result.failure(e)
